@@ -214,7 +214,7 @@ sr_icmp_t3_hdr_t *packet_get_icmp_t3_hdr(uint8_t *packet) {
 struct sr_if* sr_iface_for_dst(struct sr_instance *sr, uint32_t dst) {
   
   // current entry 
-  struct sr_if* rt_walker = sr->routing_table; 
+  struct sr_rt* rt_walker = sr->routing_table; 
 
   while(rt_walker) {
     uint32_t d1 = rt_walker->mask.s_addr & dst;
