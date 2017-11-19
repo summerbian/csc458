@@ -89,8 +89,11 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
     unsigned int len, struct sr_if *rec_iface) {
   // Get interface we need to send this packet out on
   sr_ip_hdr_t *ip_hdr = packet_get_ip_hdr(packet);
-  struct sr_if *out_if = sr_iface_for_dst(sr, ip_hdr->ip_dst);
 
+  struct sr_rt *next_hop_ip = calculate_LPM(sr, ip_hdr->ip_dst);
+
+  struct sr_if *out_if = sr_get_interface(sr, next_hop_ip->interface);
+  
   // See if we have a matching interface to forward the packet to
   if(out_if) {
     struct sr_arpentry *arp_entry = sr_arpcache_lookup(&sr->cache,
@@ -113,7 +116,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
   }
   else {
     // Don't know where to forward this, ICMP error send net unreachable
-    Debug("\t NO matching interface, ICMP error send\n");
+    Debug("\t No matching interface, ICMP error send\n");
     sr_send_icmp_t3_to(sr, packet, icmp_protocol_type_dest_unreach,
         icmp_protocol_code_net_unreach, rec_iface);
   }
