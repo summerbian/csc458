@@ -1,11 +1,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "sr_rt.h"
 #include "sr_protocol.h"
+#include "sr_router.h"
 #include "sr_utils.h"
 
 
-uint16_t cksum (const void *_data, int len) {
+uint16_t cksum(const void *_data, int len) {
   const uint8_t *data = _data;
   uint32_t sum;
 
@@ -183,3 +185,258 @@ void print_hdrs(uint8_t *buf, uint32_t length) {
   }
 }
 
+sr_ethernet_hdr_t *packet_get_eth_hdr(uint8_t *packet) {
+  return (sr_ethernet_hdr_t *)packet;
+}
+
+sr_arp_hdr_t *packet_get_arp_hdr(uint8_t *packet) {
+    return (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+}
+
+sr_ip_hdr_t *packet_get_ip_hdr(uint8_t *packet) {
+  return (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+}
+
+sr_icmp_hdr_t *packet_get_icmp_hdr(uint8_t *packet) {
+  return (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+}
+
+sr_icmp_t3_hdr_t *packet_get_icmp_t3_hdr(uint8_t *packet) {
+  return (sr_icmp_t3_hdr_t *)packet_get_icmp_hdr(packet);
+}
+
+/* Uses routing table to find the subnet where we a destination
+ * IP is located.
+ * Implementation of algorithm on page 222 in book,
+ * don't need to use LPM when we have a routing table.
+*/
+struct sr_if* sr_iface_for_dst(struct sr_instance *sr, uint32_t dst) {
+  struct sr_rt* rt_walker = sr->routing_table; // current entry we're looking at
+
+  // Loop through each entry in the routing table
+  while(rt_walker) {
+    uint32_t d1 = rt_walker->mask.s_addr & dst;
+
+    if(d1 == rt_walker->dest.s_addr)
+       return sr_get_interface(sr, rt_walker->interface);
+
+    rt_walker = rt_walker->next;
+  }
+  // We haven't found an entry, so just return null
+  return NULL;
+}
+
+void sr_forward_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t* dest_mac, struct sr_if *out_iface) {
+  sr_ethernet_hdr_t *eth_hdr = packet_get_eth_hdr(packet);
+  sr_ip_hdr_t *ip_hdr = packet_get_ip_hdr(packet);
+
+  memcpy(eth_hdr->ether_dhost, dest_mac, ETHER_ADDR_LEN);
+  memcpy(eth_hdr->ether_shost, out_iface->addr, ETHER_ADDR_LEN);
+  // Recompute checksum
+  ip_hdr->ip_sum = 0;
+  ip_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t)); 
+
+  // Send it away!
+  sr_send_packet(sr, packet, len, out_iface->name);
+}
+
+/*
+ * Modifies the given ICMP packet and sends it back out, not
+ * adding a data section to the packet (only used when we
+ * get and need to resend an ICMP echo req in sr_handle_ip.c)
+ */
+int sr_send_icmp(struct sr_instance *sr, uint8_t icmp_type,
+    uint8_t icmp_code, uint8_t *packet, int len, struct sr_if * rec_iface) {
+  sr_ethernet_hdr_t *eth_hdr = packet_get_eth_hdr(packet);
+  sr_ip_hdr_t *ip_hdr = packet_get_ip_hdr(packet);
+  sr_icmp_hdr_t *icmp_hdr = packet_get_icmp_hdr(packet);
+
+  // Get interface we should be sending the packet out on
+  struct sr_if *out_iface = sr_iface_for_dst(sr, ip_hdr->ip_src);
+
+  memcpy(eth_hdr->ether_dhost, eth_hdr->ether_shost, ETHER_ADDR_LEN);
+  memcpy(eth_hdr->ether_shost, out_iface->addr, ETHER_ADDR_LEN);
+
+  uint32_t req_src = ip_hdr->ip_src;
+  ip_hdr->ip_src = rec_iface->ip; // src is this interface's ip
+  ip_hdr->ip_dst = req_src; // dest is requester's ip
+
+  icmp_hdr->icmp_type = icmp_type;
+  icmp_hdr->icmp_code = icmp_code;
+  icmp_hdr->icmp_sum = 0; // compute checksum of hdr
+  icmp_hdr->icmp_sum = cksum(icmp_hdr, len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t)); 
+
+  int res = sr_send_packet(sr, packet, len, out_iface->name);
+  return res;
+}
+
+// Sends an ICMP error message from sr out of interface iface
+// to receiver noted in the uint8_t receiver IP packet.
+int sr_send_icmp_t3_to(struct sr_instance *sr, uint8_t *receiver,
+    uint8_t icmp_type, uint8_t icmp_code, struct sr_if *rec_iface) {
+
+  // Allocate space for a shiny new ICMP packet (with room for data)
+  unsigned int len = sizeof(sr_ethernet_hdr_t) +
+    sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+  uint8_t *packet = (uint8_t *)malloc(len);
+  bzero(packet, len);
+
+  // Get our newly constructed packet headers
+  sr_ethernet_hdr_t *eth_hdr = packet_get_eth_hdr(packet);
+  sr_ip_hdr_t *ip_hdr = packet_get_ip_hdr(packet);
+  sr_icmp_t3_hdr_t *icmp_hdr = packet_get_icmp_t3_hdr(packet);
+
+  // Get original sender (our receiver) header infos
+  sr_ethernet_hdr_t *rec_eth_hdr = packet_get_eth_hdr(receiver);
+  sr_ip_hdr_t *rec_ip_hdr = packet_get_ip_hdr(receiver);
+
+  // Find interface we should be sending the packet out on
+  struct sr_if *out_iface = sr_iface_for_dst(sr, rec_ip_hdr->ip_src);
+
+  // Construct ethernet hdr
+  memcpy(eth_hdr->ether_dhost, rec_eth_hdr->ether_shost, ETHER_ADDR_LEN);
+  memcpy(eth_hdr->ether_shost, out_iface->addr, ETHER_ADDR_LEN);
+  eth_hdr->ether_type = htons(ethertype_ip);
+
+  // Construct IP hdr
+  ip_hdr->ip_hl = rec_ip_hdr->ip_hl;
+  ip_hdr->ip_id = 0;
+  ip_hdr->ip_p = ip_protocol_icmp;
+  ip_hdr->ip_tos = rec_ip_hdr->ip_tos;
+  ip_hdr->ip_off = htons(IP_DF); // set dont fragment bit
+  ip_hdr->ip_ttl = INIT_TTL;
+  ip_hdr->ip_v = rec_ip_hdr->ip_v;
+  ip_hdr->ip_src = rec_iface->ip;
+  ip_hdr->ip_dst = rec_ip_hdr->ip_src;
+  ip_hdr->ip_len = htons(len - sizeof(sr_ethernet_hdr_t));
+  ip_hdr->ip_sum = 0;
+  ip_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t));
+
+  // Construct ICMP header
+  icmp_hdr->icmp_type = icmp_type;
+  icmp_hdr->icmp_code = icmp_code;
+  memcpy(icmp_hdr->data, rec_ip_hdr, ICMP_DATA_SIZE);
+  icmp_hdr->icmp_sum = 0;
+  icmp_hdr->icmp_sum = cksum(icmp_hdr, sizeof(sr_icmp_t3_hdr_t));
+
+  int res = sr_send_packet(sr, packet, len, out_iface->name);
+  return res;
+}
+
+int sr_send_arp_req(struct sr_instance *sr, uint32_t tip) {
+  // Allocate space for a new ARP request  packet
+  unsigned int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
+  uint8_t *packet = (uint8_t *)malloc(len);
+  bzero(packet, len);
+
+  // Find interface we should be sending the packet out on
+  struct sr_if *out_iface = sr_iface_for_dst(sr, tip);
+
+  struct sr_ethernet_hdr *eth_hdr = packet_get_eth_hdr(packet);
+  struct sr_arp_hdr *arp_hdr = packet_get_arp_hdr(packet);
+
+  // Fill in header information
+  memset(eth_hdr->ether_dhost, 0xff, ETHER_ADDR_LEN);
+  memcpy(eth_hdr->ether_shost, out_iface->addr, ETHER_ADDR_LEN);
+  eth_hdr->ether_type = htons(ethertype_arp);
+
+  arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
+  arp_hdr->ar_pro = htons(ethertype_ip);
+  arp_hdr->ar_hln = ETHER_ADDR_LEN;
+  arp_hdr->ar_pln = 4;
+  arp_hdr->ar_op = htons(arp_op_request);
+  memcpy(arp_hdr->ar_sha, out_iface->addr, ETHER_ADDR_LEN);
+  arp_hdr->ar_sip = out_iface->ip;
+  memset(arp_hdr->ar_tha, 0xff, ETHER_ADDR_LEN);
+  arp_hdr->ar_tip = tip;
+
+  int res = sr_send_packet(sr, packet, len, out_iface->name);
+  return res;
+}
+
+int sr_send_arp_rep(struct sr_instance *sr, sr_ethernet_hdr_t *req_eth_hdr,
+    sr_arp_hdr_t *req_arp_hdr, struct sr_if* rec_iface) {
+  unsigned int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
+  uint8_t *rep_packet = (uint8_t *)malloc(len);
+  bzero(rep_packet, len);
+
+  // Get headers of our new packet
+  sr_ethernet_hdr_t *rep_eth_hdr = packet_get_eth_hdr(rep_packet);
+  sr_arp_hdr_t *rep_arp_hdr = packet_get_arp_hdr(rep_packet);
+
+  // Fill eth header entries
+  // set destination to origin
+  memcpy(rep_eth_hdr->ether_dhost,
+      req_eth_hdr->ether_shost, ETHER_ADDR_LEN);
+  //set source to our interface's eth addr
+  memcpy(rep_eth_hdr->ether_shost,
+      rec_iface->addr, ETHER_ADDR_LEN);
+  // ethernet type is ARP
+  rep_eth_hdr->ether_type = ntohs(ethertype_arp);
+
+  // Fill ARP hdr entries
+  rep_arp_hdr->ar_hrd = req_arp_hdr->ar_hrd; // 1 for ethernet
+  rep_arp_hdr->ar_pro = req_arp_hdr->ar_pro; // protocol format is IPv4 (0x800)
+  rep_arp_hdr->ar_hln = req_arp_hdr->ar_hln; // hardware length is same (6 = ETHER_ADDR_LEN)
+  rep_arp_hdr->ar_pln = req_arp_hdr->ar_pln; // protocol length is same (4)
+  rep_arp_hdr->ar_op = htons(arp_op_reply); // ARP reply
+  memcpy(rep_arp_hdr->ar_sha,
+      rec_iface->addr, ETHER_ADDR_LEN); // set hw addr
+  rep_arp_hdr->ar_sip = rec_iface->ip; // setting us as sender
+  memcpy(rep_arp_hdr->ar_tha,
+      req_arp_hdr->ar_sha, ETHER_ADDR_LEN); // target
+  rep_arp_hdr->ar_tip = req_arp_hdr->ar_sip;
+
+  // Put our new (modified) packet back on the wire
+  int res = sr_send_packet(sr, rep_packet, len, rec_iface->name);
+  return res;
+}
+
+uint8_t sanity_check_arp_packet_len_ok(unsigned int len) {
+  uint8_t under = len >= (sizeof(sr_ethernet_hdr_t) +
+      sizeof(sr_arp_hdr_t));
+  return under;
+}
+
+uint8_t sanity_check_ip_packet_len_ok(unsigned int len) {
+  uint8_t under = len >= (sizeof(sr_ethernet_hdr_t) +
+      sizeof(sr_ip_hdr_t));
+  return under;
+}
+
+uint8_t sanity_check_icmp_packet_len_ok(unsigned int len) {
+  uint8_t under = len >= (sizeof(sr_ethernet_hdr_t) +
+      sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t));
+  return under;
+}
+
+// Returns 0 (false) if unequal, 1 (true) if it checks out
+uint8_t is_ip_chksum_ok(sr_ip_hdr_t *ip_hdr) {
+  uint16_t tmp_sum = ip_hdr->ip_sum;
+  ip_hdr->ip_sum = 0; // temporarily substitue with 0
+
+  if(cksum(ip_hdr, sizeof(sr_ip_hdr_t)) == tmp_sum) {
+    ip_hdr->ip_sum = tmp_sum; // reset cheksum as if nothing happened...
+    return 1;
+  }
+  else {
+    ip_hdr->ip_sum = tmp_sum; // reset checksum as if nothing happened...
+    return 0;
+  }
+}
+
+// Like the previous function, returns 0 (false) if unequal, 1 (true) if
+// checks out
+uint8_t is_icmp_chksum_ok(uint16_t len, sr_icmp_hdr_t *icmp_hdr) {
+  uint16_t tmp_sum = icmp_hdr->icmp_sum;
+  icmp_hdr->icmp_sum = 0; // temporarily substitute with 0
+  
+  if(cksum((uint8_t *)icmp_hdr, ntohs(len) - sizeof(sr_ip_hdr_t)) == tmp_sum) {
+    icmp_hdr->icmp_sum = tmp_sum; // reset cheksum as if nothing happened...
+    return 1;
+  }
+  else {
+    icmp_hdr->icmp_sum = tmp_sum; // reset checksum as if nothing happened...
+    return 0;
+  }
+}

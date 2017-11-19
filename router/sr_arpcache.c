@@ -1,15 +1,46 @@
-#include <netinet/in.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
 #include <unistd.h>
-#include <pthread.h>
-#include <sched.h>
 #include <string.h>
 #include "sr_arpcache.h"
 #include "sr_router.h"
-#include "sr_if.h"
-#include "sr_protocol.h"
+#include "sr_utils.h"
+
+/*
+ * This function handles sending ARP requests if necessary. Based on
+ * pesudocode given in header
+ */
+void sr_arpcache_handle_req_sending(struct sr_instance *sr, struct sr_arpreq *req) {
+  time_t now = time(NULL);
+
+  // Since there can be multiple calls to this function,
+  // get exclusive access to the cache
+  pthread_mutex_lock(&sr->cache.lock);
+
+  if(difftime(now, req->sent) > 1.0) {
+    Debug("\t\tARP req still pending, finding out whether to drop or send again\n");
+
+    if(req->times_sent >= 5) {
+      Debug("Dropping ARP request and sending ICMP host unreachable to all waiting hosts\n");
+
+      struct sr_packet *cur_req_packet = req->packets;
+
+      while(cur_req_packet) {
+        sr_send_icmp_t3_to(sr, cur_req_packet->buf,
+            icmp_protocol_type_dest_unreach, icmp_protocol_code_host_unreach,
+            sr_get_interface(sr, cur_req_packet->iface));
+        
+        cur_req_packet = cur_req_packet->next;
+      }
+      sr_arpreq_destroy(&sr->cache, req);
+    }
+    else {
+      sr_send_arp_req(sr, req->ip);
+      req->sent = time(NULL);
+      req->times_sent++;
+    }
+  }
+  pthread_mutex_unlock(&sr->cache.lock);
+}
 
 /* 
   This function gets called every second. For each request sent out, we keep
@@ -17,7 +48,19 @@
   See the comments in the header file for an idea of what it should look like.
 */
 void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
-    /* Fill this in */
+  struct sr_arpreq *req = sr->cache.requests;
+
+  while(req != NULL) {
+    /* From header:
+       Since handle_arpreq as defined in the comments above could destroy your
+       current request, make sure to save the next pointer before calling
+       handle_arpreq when traversing through the ARP requests linked list.
+     */
+    struct sr_arpreq *next_req = req->next;
+
+    sr_arpcache_handle_req_sending(sr, req);
+    req = next_req;
+  }
 }
 
 /* You should not need to touch the rest of this code. */

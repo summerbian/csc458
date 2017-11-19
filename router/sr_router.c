@@ -12,6 +12,8 @@
  **********************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 
 
@@ -21,6 +23,8 @@
 #include "sr_protocol.h"
 #include "sr_arpcache.h"
 #include "sr_utils.h"
+#include "sr_handle_arp.h"
+#include "sr_handle_ip.h"
 
 /*---------------------------------------------------------------------
  * Method: sr_init(void)
@@ -45,7 +49,6 @@ void sr_init(struct sr_instance* sr)
     pthread_t thread;
 
     pthread_create(&thread, &(sr->attr), sr_arpcache_timeout, sr);
-    
     /* Add initialization code here! */
 
 } /* -- sr_init -- */
@@ -76,9 +79,22 @@ void sr_handlepacket(struct sr_instance* sr,
   assert(packet);
   assert(interface);
 
-  printf("*** -> Received packet of length %d \n",len);
+  uint16_t ethtype = ethertype(packet);
 
-  /* fill in code here */
+  //printf("*** -> Received packet of length %d \n",len);
 
-}/* end sr_ForwardPacket */
+  // Get interface of router this packet was received on
+  struct sr_if *rec_iface = sr_get_interface(sr, interface);
 
+  switch(ethtype) {
+    case ethertype_arp:
+      sr_handle_arp(sr, packet, len, rec_iface);
+      break;
+    case ethertype_ip:
+      sr_handle_ip(sr, packet, len, rec_iface);
+      break;
+    default:
+      fprintf(stderr, "Packet was neither of type ARP or IP, dropping\n");
+      return;
+  }
+}/* end sr_handlepacket */
