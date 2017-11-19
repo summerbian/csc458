@@ -210,10 +210,8 @@ sr_icmp_t3_hdr_t *packet_get_icmp_t3_hdr(uint8_t *packet) {
  * Implementation of algorithm on page 222 in book,
  * don't need to use LPM when we have a routing table.
 */
-/*
+
 struct sr_if* sr_iface_for_dst(struct sr_instance *sr, uint32_t dst) {
-  
-  sr_get_interface(sr, next_hop_ip->interface)
   
   // current entry 
   struct sr_if* rt_walker = sr->routing_table; 
@@ -229,7 +227,7 @@ struct sr_if* sr_iface_for_dst(struct sr_instance *sr, uint32_t dst) {
   return NULL;
   
 }
-*/
+
 struct sr_rt *calculate_LPM(struct sr_instance *sr, uint32_t destination_ip)
 {
     struct sr_rt *routing_table_node = sr->routing_table;
