@@ -218,7 +218,7 @@ struct sr_if* sr_iface_for_dst(struct sr_instance *sr, uint32_t dst) {
 
   // go through each interface
   while(current_interface) {
-    if(dest == current_interface->ip){
+    if(dst == current_interface->ip){
       destination_interface = current_interface;
       break;
     }
