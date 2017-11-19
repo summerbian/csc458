@@ -211,19 +211,21 @@ sr_icmp_t3_hdr_t *packet_get_icmp_t3_hdr(uint8_t *packet) {
  * don't need to use LPM when we have a routing table.
 */
 struct sr_if* sr_iface_for_dst(struct sr_instance *sr, uint32_t dst) {
-  struct sr_rt* rt_walker = sr->routing_table; // current entry we're looking at
+  
+  // current entry 
+  struct sr_if* current_interface = sr->if_list; 
+  struct sr_if* destination_interface = NULL;
 
-  // Loop through each entry in the routing table
-  while(rt_walker) {
-    uint32_t d1 = rt_walker->mask.s_addr & dst;
+  // go through each interface
+  while(current_interface) {
+    if(dest == current_interface->ip){
+      destination_interface = current_interface;
+      break;
+    }
+    current_interface = current_interface->next;
 
-    if(d1 == rt_walker->dest.s_addr)
-       return sr_get_interface(sr, rt_walker->interface);
-
-    rt_walker = rt_walker->next;
   }
-  // We haven't found an entry, so just return null
-  return NULL;
+  return destination_interface;
 }
 
 void sr_forward_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t* dest_mac, struct sr_if *out_iface) {
