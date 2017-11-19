@@ -210,12 +210,14 @@ sr_icmp_t3_hdr_t *packet_get_icmp_t3_hdr(uint8_t *packet) {
  * Implementation of algorithm on page 222 in book,
  * don't need to use LPM when we have a routing table.
 */
+/*
 struct sr_if* sr_iface_for_dst(struct sr_instance *sr, uint32_t dst) {
+  
+  sr_get_interface(sr, next_hop_ip->interface)
   
   // current entry 
   struct sr_if* rt_walker = sr->routing_table; 
 
-  // Loop through each entry in the routing table
   while(rt_walker) {
     uint32_t d1 = rt_walker->mask.s_addr & dst;
 
@@ -224,9 +226,25 @@ struct sr_if* sr_iface_for_dst(struct sr_instance *sr, uint32_t dst) {
 
     rt_walker = rt_walker->next;
   }
-  // We haven't found an entry, so just return null
   return NULL;
+  
 }
+*/
+struct sr_rt *calculate_LPM(struct sr_instance *sr, uint32_t destination_ip)
+{
+    struct sr_rt *routing_table_node = sr->routing_table;
+    struct sr_rt *best_match = NULL;
+    while (routing_table_node) {
+        if ((routing_table_node->dest.s_addr & routing_table_node->mask.s_addr) == (destination_ip & routing_table_node->mask.s_addr)) {
+            if (!best_match || (routing_table_node->mask.s_addr > best_match->mask.s_addr)) {
+                best_match = routing_table_node;
+            }
+        }
+        routing_table_node = routing_table_node->next;
+    }
+    return best_match;
+}
+
 
 void sr_forward_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t* dest_mac, struct sr_if *out_iface) {
   sr_ethernet_hdr_t *eth_hdr = packet_get_eth_hdr(packet);
