@@ -2,6 +2,9 @@
 #include "sr_router.h"
 #include "sr_utils.h"
 #include "sr_handle_ip.h"
+#include "sr_if.h"
+#include "sr_rt.h"
+
 
 /* Scope: local to this file
  * Given the IP header and the length of the entire packet, finds out
@@ -93,7 +96,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
   struct sr_rt *next_hop_ip = calculate_LPM(sr, ip_hdr->ip_dst);
 
   struct sr_if *out_if = sr_get_interface(sr, next_hop_ip->interface);
-  
+
   // See if we have a matching interface to forward the packet to
   if(out_if) {
     struct sr_arpentry *arp_entry = sr_arpcache_lookup(&sr->cache,
