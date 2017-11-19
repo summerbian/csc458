@@ -103,7 +103,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
       return;
     }
     else {
-      Debug("\tNo entry found for receiver IP, queing packet and sending ARP req\n");
+      Debug("\t No entry found for receiver IP, queing packet and sending ARP req\n");
       struct sr_arpreq *req = sr_arpcache_queuereq(&sr->cache, 
           ip_hdr->ip_dst, packet, len, out_if->name);
 
@@ -113,7 +113,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
   }
   else {
     // Don't know where to forward this, ICMP error send net unreachable
-    Debug("\tGo home, you're drunk! I don't have an interface for that!\n");
+    Debug("\t NO matching interface, ICMP error send\n");
     sr_send_icmp_t3_to(sr, packet, icmp_protocol_type_dest_unreach,
         icmp_protocol_code_net_unreach, rec_iface);
   }
