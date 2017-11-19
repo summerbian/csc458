@@ -8,7 +8,7 @@
  * whether the length of the packet is at least what is required to fill the
  * header, along with making sure that the header checksum is calculated correctly
  */
-uint8_t is_sanity_check_of_ip_packet_ok(sr_ip_hdr_t *ip_hdr, unsigned int len) {
+uint8_t check_ip_packet_ok(sr_ip_hdr_t *ip_hdr, unsigned int len) {
   uint8_t we_good = 1; // assume all is well
   if(!sanity_check_ip_packet_len_ok(len)) {
     Debug("Sanity check for IP packet failed! Dropping packet.\n");
@@ -45,7 +45,7 @@ void sr_handle_ip(struct sr_instance* sr, uint8_t *packet,
   sr_ip_hdr_t *ip_hdr = packet_get_ip_hdr(packet);
 
   // Check for too small packet length or wrong checksum
-  if(!is_sanity_check_of_ip_packet_ok(ip_hdr, len)) return;
+  if(!check_ip_packet_ok(ip_hdr, len)) return;
 
   struct sr_if *iface_walker = sr->if_list;
 
