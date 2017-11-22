@@ -26,7 +26,7 @@ void sr_arpcache_handle_req_sending(struct sr_instance *sr, struct sr_arpreq *re
 
       while(cur_req_packet) {
         sr_send_icmp_t3_to(sr, cur_req_packet->buf,
-            icmp_protocol_type_dest_unreach, icmp_protocol_code_host_unreach,
+            icmp_type_dest_unreachable, icmp_code_host_unreachable,
             sr_get_interface(sr, cur_req_packet->iface), NULL);
         
         cur_req_packet = cur_req_packet->next;
@@ -73,7 +73,7 @@ void handle_arpreq(struct sr_instance* sr, struct sr_arpreq *req) {
                 sr_ethernet_hdr_t *ehdr = packet_get_eth_hdr(queued_packet->buf);
 
                 struct sr_if* rec_iface = get_outgoing_iface(sr, ehdr->ether_dhost);
-                send_icmp_t3_to(sr, queued_packet->buf, 
+                sr_send_icmp_t3_to(sr, queued_packet->buf, 
                 icmp_type_dest_unreachable, icmp_code_host_unreachable, rec_iface, NULL);
                     
                 queued_packet = queued_packet->next;
@@ -81,7 +81,7 @@ void handle_arpreq(struct sr_instance* sr, struct sr_arpreq *req) {
 
         }
         else {
-            send_arp_request(sr, req);
+            sr_send_arp_req(sr, req->packets->iface);
             req->sent = time(NULL);
             req->times_sent++;
         }
