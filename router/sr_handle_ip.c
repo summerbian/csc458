@@ -59,7 +59,7 @@ void sr_handle_ip(struct sr_instance* sr, uint8_t *packet,
     if(iface_walker->ip == ip_hdr->ip_dst) {
       Debug("Got a packet destined the router at interface %s\n",
           iface_walker->name);
-      sr_handle_ip_rec(sr, packet, len, iface_walker);
+      sr_handle_ip_rec(sr, packet, len, rec_iface, iface_walker);
       return;
     }
     iface_walker = iface_walker->next;
