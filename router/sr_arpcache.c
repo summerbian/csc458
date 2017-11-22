@@ -16,7 +16,7 @@ void sr_arpcache_handle_req_sending(struct sr_instance *sr, struct sr_arpreq *re
   // get exclusive access to the cache
   pthread_mutex_lock(&sr->cache.lock);
 
-  if(difftime(now, req->sent) > 1.0) {
+  if(difftime(now, req->sent) >= 1.0) {
     Debug("\t\tARP req still pending, finding out whether to drop or send again\n");
 
     if(req->times_sent >= 5) {
@@ -25,9 +25,11 @@ void sr_arpcache_handle_req_sending(struct sr_instance *sr, struct sr_arpreq *re
       struct sr_packet *cur_req_packet = req->packets;
 
       while(cur_req_packet) {
+        sr_ethernet_hdr_t *ehdr = packet_get_eth_hdr(cur_req_packet->buf);
+        struct sr_if* rec_iface = get_outgoing_iface(sr, ehdr->ether_dhost);
         sr_send_icmp_t3_to(sr, cur_req_packet->buf,
             icmp_protocol_type_dest_unreach, icmp_protocol_code_host_unreach,
-            sr_get_interface(sr, cur_req_packet->iface), NULL);
+            rec_iface, NULL);
         
         cur_req_packet = cur_req_packet->next;
       }
