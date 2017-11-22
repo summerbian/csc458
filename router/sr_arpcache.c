@@ -70,11 +70,11 @@ void handle_arpreq(struct sr_instance* sr, struct sr_arpreq *req) {
             struct sr_packet *queued_packet = req->packets;
 
             while(queued_packet) {
-                sr_ethernet_hdr_t *ehdr = sr_ethernet_hdr_t(queued_packet->buf);
+                sr_ethernet_hdr_t *ehdr = packet_get_eth_hdr(queued_packet->buf);
 
                 struct sr_if* rec_iface = get_outgoing_iface(sr, ehdr->ether_dhost);
-                send_icmp_t3(sr, queued_packet->buf, icmp_type_dest_unreachable, 
-                    icmp_code_host_unreachable, NULL, rec_iface);
+                send_icmp_t3_to(sr, queued_packet->buf, icmp_type_dest_unreachable, 
+                    icmp_code_host_unreachable, rec_iface, NULL);
                     
                 queued_packet = queued_packet->next;
             }
