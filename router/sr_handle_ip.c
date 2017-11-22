@@ -94,16 +94,19 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
   sr_ip_hdr_t *ip_hdr = packet_get_ip_hdr(packet);
 
   struct sr_rt *next_hop_ip = calculate_LPM(sr, ip_hdr->ip_dst);
+  if (!next_hop_ip){
+    // Don't know where to forward this, ICMP error send net unreachable
+    Debug("\t No matching interface, ICMP error send\n");
+    sr_send_icmp_t3_to(sr, packet, icmp_protocol_type_dest_unreach,icmp_protocol_code_net_unreach, rec_iface, NULL );
+  }
 
   struct sr_if *out_if = sr_get_interface(sr, next_hop_ip->interface);
 
   // See if we have a matching interface to forward the packet to
   if(out_if) {
-    struct sr_arpentry *arp_entry = sr_arpcache_lookup(&sr->cache,
-        ip_hdr->ip_dst);
+    struct sr_arpentry *arp_entry = sr_arpcache_lookup(&sr->cache, ip_hdr->ip_dst);
     if(arp_entry) {
       Debug("Using next_hop_ip->mac mapping in entry to send the packet\n");
-
       sr_forward_packet(sr, packet, len, arp_entry->mac, out_if);
       free(arp_entry);
       return;
@@ -117,11 +120,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
       return;
     }
   }
-  else {
-    // Don't know where to forward this, ICMP error send net unreachable
-    Debug("\t No matching interface, ICMP error send\n");
-    sr_send_icmp_t3_to(sr, packet, icmp_protocol_type_dest_unreach,icmp_protocol_code_net_unreach, rec_iface, NULL );
-  }
+  
 }
 
 void sr_handle_ip_rec(struct sr_instance *sr, uint8_t *packet,
