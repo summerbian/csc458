@@ -57,8 +57,7 @@ void sr_handle_ip(struct sr_instance* sr, uint8_t *packet,
     // If we are the receiver, could also compare ethernet
     // addresses as an extra check
     if(iface_walker->ip == ip_hdr->ip_dst) {
-      Debug("Got a packet destined the router at interface %s\n",
-          iface_walker->name);
+      Debug("Got a packet destined the router at interface %s\n");
       sr_handle_ip_rec(sr, packet, len, rec_iface, iface_walker);
       return;
     }
@@ -71,7 +70,7 @@ void sr_handle_ip(struct sr_instance* sr, uint8_t *packet,
   ip_hdr->ip_ttl--;
 
   // If TTL now 0, drop and let sender know
-  if(ip_hdr->ip_ttl == 0) {
+  if(ip_hdr->ip_ttl <= 0) {
     Debug("\tDecremented a packet to TTL of 0, dropping and sending TTL expired ICMP\n");
     sr_send_icmp_t3_to(sr, packet,
         icmp_protocol_type_time_exceed, icmp_protocol_code_ttl_expired,
@@ -95,8 +94,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
 
   struct sr_rt *next_hop_ip = calculate_LPM(sr, ip_hdr->ip_dst);
   if (!next_hop_ip){
-    // Don't know where to forward this, ICMP error send net unreachable
-    Debug("\t No matching interface, ICMP error send\n");
+    Debug("\t net unreachable\n");
     sr_send_icmp_t3_to(sr, packet, icmp_protocol_type_dest_unreach,icmp_protocol_code_net_unreach, rec_iface, NULL );
   }
 
