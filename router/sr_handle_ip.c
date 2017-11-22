@@ -126,11 +126,10 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
 }
 
 void sr_handle_ip_rec(struct sr_instance *sr, uint8_t *packet,
-    unsigned int len, struct sr_if *rec_iface) {
+    unsigned int len, struct sr_if *rec_iface, struct sr_if* target_iface) {
+
   Debug("Got IP packet:\n");
-
   sr_ip_hdr_t *ip_hdr = packet_get_ip_hdr(packet);
-
   // Get IP protocol information
   uint8_t ip_proto = ip_hdr->ip_p;
 
@@ -142,22 +141,23 @@ void sr_handle_ip_rec(struct sr_instance *sr, uint8_t *packet,
           rec_iface->name);
       // Send ICMP port unreachable
       sr_send_icmp_t3_to(sr, packet, icmp_protocol_type_dest_unreach,
-          icmp_protocol_code_port_unreach, rec_iface);
+          icmp_protocol_code_port_unreach, rec_iface, target_iface);
       break;
-    // If it is an ICMP packet...
+    
     case ip_protocol_icmp: ;
-      // Extract header info
+      Debug("is an icmp packet\n");
       sr_icmp_hdr_t *icmp_hdr = packet_get_icmp_hdr(packet);
 
       // Check for too small packet length or wrong checksum
-      if(!is_sanity_check_of_icmp_packet_ok(ip_hdr, icmp_hdr, len)) return;
+      if(!is_sanity_check_of_icmp_packet_ok(ip_hdr, icmp_hdr, len)) 
+            return;
 
       if(icmp_hdr->icmp_type == icmp_protocol_type_echo_req &&
           icmp_hdr->icmp_code == icmp_protocol_code_empty) {
         
         // Send ICMP echo reply
         sr_send_icmp(sr, icmp_protocol_type_echo_rep,
-            icmp_protocol_type_echo_rep, packet, len, rec_iface);
+          icmp_protocol_type_echo_rep, packet, len, rec_iface, target_iface);
       }
       break;
     default:
