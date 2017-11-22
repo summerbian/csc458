@@ -27,7 +27,7 @@ void sr_arpcache_handle_req_sending(struct sr_instance *sr, struct sr_arpreq *re
       while(cur_req_packet) {
         sr_send_icmp_t3_to(sr, cur_req_packet->buf,
             icmp_protocol_type_dest_unreach, icmp_protocol_code_host_unreach,
-            sr_get_interface(sr, cur_req_packet->iface));
+            sr_get_interface(sr, cur_req_packet->iface), NULL);
         
         cur_req_packet = cur_req_packet->next;
       }
@@ -61,6 +61,32 @@ void sr_arpcache_sweepreqs(struct sr_instance *sr) {
     sr_arpcache_handle_req_sending(sr, req);
     req = next_req;
   }
+}
+
+void handle_arpreq(struct sr_instance* sr, struct sr_arpreq *req) {
+    time_t now = time(NULL);
+    if(difftime(now, req->sent) >= 1.0) {
+        if (req->times_sent >= 5) {
+            struct sr_packet *queued_packet = req->packets;
+
+            while(queued_packet) {
+                sr_ethernet_hdr_t *ehdr = get_eth_header(queued_packet->buf);
+
+                struct sr_if* rec_iface = get_outgoing_iface(sr, ehdr->ether_dhost);
+                send_icmp_t3(sr, queued_packet->buf, icmp_type_dest_unreachable, 
+                    icmp_code_host_unreachable, NULL, rec_iface);
+                    
+                queued_packet = queued_packet->next;
+            }
+
+        }
+        else {
+            send_arp_request(sr, req);
+            req->sent = time(NULL);
+            req->times_sent++;
+        }
+    }
+
 }
 
 /* You should not need to touch the rest of this code. */
