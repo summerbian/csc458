@@ -54,6 +54,8 @@ sr_icmp_t3_hdr_t *packet_get_icmp_t3_hdr(uint8_t *packet);
 
 struct sr_if* sr_iface_for_dst(struct sr_instance *sr, uint32_t dst);
 
+struct sr_if *get_outgoing_iface(struct sr_instance *sr, uint8_t *addr)
+
 struct sr_rt *calculate_LPM(struct sr_instance *sr, uint32_t destination_ip);
 
 void sr_forward_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t* dest_mac, struct sr_if *out_iface);

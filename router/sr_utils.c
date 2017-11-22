@@ -228,6 +228,29 @@ struct sr_if* sr_iface_for_dst(struct sr_instance *sr, uint32_t dst) {
   
 }
 
+struct sr_if *get_outgoing_iface(struct sr_instance *sr, uint8_t *addr)
+{
+    struct sr_if *curr_iface = sr->if_list;
+    struct sr_if *dest_iface = NULL;
+    short match, i;
+    while (curr_iface) {
+        match = 1;
+        for (i = 0; i < ETHER_ADDR_LEN; i++) {
+            if (curr_iface->addr[i] != addr[i]) {
+                match = 0;
+                break;
+            }
+        }
+        if (match) {
+            dest_iface = curr_iface;
+            break;
+        }
+        curr_iface = curr_iface->next;
+    }
+    return dest_iface;
+}
+
+
 struct sr_rt *calculate_LPM(struct sr_instance *sr, uint32_t destination_ip)
 {
     struct sr_rt *routing_table_node = sr->routing_table;
