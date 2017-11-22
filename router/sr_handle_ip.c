@@ -47,7 +47,7 @@ void sr_handle_ip(struct sr_instance* sr, uint8_t *packet,
     unsigned int len, struct sr_if *rec_iface) {
   sr_ip_hdr_t *ip_hdr = packet_get_ip_hdr(packet);
 
-  // Check for too small packet length or wrong checksum
+  
   if(!check_ip_packet_ok(ip_hdr, len)) return;
 
   struct sr_if *iface_walker = sr->if_list;
@@ -75,7 +75,7 @@ void sr_handle_ip(struct sr_instance* sr, uint8_t *packet,
     Debug("\tDecremented a packet to TTL of 0, dropping and sending TTL expired ICMP\n");
     sr_send_icmp_t3_to(sr, packet,
         icmp_protocol_type_time_exceed, icmp_protocol_code_ttl_expired,
-        rec_iface);
+        rec_iface, NULL);
     return;
   }
 
@@ -121,7 +121,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
     // Don't know where to forward this, ICMP error send net unreachable
     Debug("\t No matching interface, ICMP error send\n");
     sr_send_icmp_t3_to(sr, packet, icmp_protocol_type_dest_unreach,
-      rec_iface, icmp_protocol_code_net_unreach, );
+      rec_iface, icmp_protocol_code_net_unreach);
   }
 }
 
