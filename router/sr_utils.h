@@ -58,9 +58,9 @@ struct sr_rt *calculate_LPM(struct sr_instance *sr, uint32_t destination_ip);
 
 void sr_forward_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len, uint8_t* dest_mac, struct sr_if *out_iface);
 
-int sr_send_icmp(struct sr_instance *sr, uint8_t icmp_type, uint8_t icmp_code, uint8_t *packet, int len, struct sr_if *rec_iface);
+void sr_send_icmp(struct sr_instance *sr, uint8_t icmp_type, uint8_t icmp_code, uint8_t *packet, int len, struct sr_if *rec_iface, struct sr_if* target_iface);
 
-int sr_send_icmp_t3_to(struct sr_instance *sr, uint8_t *receiver, uint8_t icmp_type, uint8_t icmp_code, struct sr_if* rec_iface);
+void sr_send_icmp_t3_to(struct sr_instance *sr, uint8_t *receiver, uint8_t icmp_type, uint8_t icmp_code, struct sr_if* rec_iface, struct sr_if* target_iface);
 
 int sr_send_arp_rep(struct sr_instance *sr, sr_ethernet_hdr_t *req_eth_hdr, sr_arp_hdr_t *req_arp_hdr, struct sr_if* rec_iface);
 int sr_send_arp_req(struct sr_instance *sr, uint32_t tip);
