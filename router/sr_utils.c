@@ -284,9 +284,9 @@ void sr_send_icmp(struct sr_instance *sr, uint8_t icmp_type,
   icmp_hdr->icmp_sum = 0; // compute checksum of hdr
   icmp_hdr->icmp_sum = cksum(icmp_hdr, len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t)); 
 
-  struct sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), iphdr->ip_dst);
+  struct sr_arpentry *entry = sr_arpcache_lookup(&(sr->cache), ip_hdr->ip_dst);
   if (!entry) {
-    struct sr_arpreq *request = sr_arpcache_queuereq(&(sr->cache), iphdr->ip_dst, packet, 
+    struct sr_arpreq *request = sr_arpcache_queuereq(&(sr->cache), ip_hdr->ip_dst, packet, 
       len, out_iface->name);
     handle_arpreq(sr, request);
     return;
