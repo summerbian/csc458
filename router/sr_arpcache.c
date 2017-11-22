@@ -78,10 +78,10 @@ void handle_arpreq(struct sr_instance* sr, struct sr_arpreq *req) {
                     
                 queued_packet = queued_packet->next;
             }
-
+            //req->ip
         }
         else {
-            sr_send_arp_req(sr, req->packets->iface);
+            sr_send_arp_req(sr, req->ip);
             req->sent = time(NULL);
             req->times_sent++;
         }
