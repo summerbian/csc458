@@ -67,7 +67,7 @@ void sr_handle_ip(struct sr_instance* sr, uint8_t *packet,
   // Not for me, do IP forwarding
   Debug("Got a packet not destined to the router, forwarding it\n");
   // Decrement TTL
-  ip_hdr->ip_ttl--;
+  ip_hdr->ip_ttl -= 1;
 
   // If TTL now 0, drop and let sender know
   if(ip_hdr->ip_ttl <= 0) {
@@ -91,18 +91,41 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
     unsigned int len, struct sr_if *rec_iface) {
   // Get interface we need to send this packet out on
   sr_ip_hdr_t *ip_hdr = packet_get_ip_hdr(packet);
+  sr_ethernet_hdr_t *eh_dr = packet_get_eth_hdr(packet);
 
   struct sr_rt *next_hop_ip = calculate_LPM(sr, ip_hdr->ip_dst);
   if (!next_hop_ip){
     Debug("\t net unreachable\n");
-    sr_send_icmp_t3_to(sr, packet, icmp_protocol_type_dest_unreach,icmp_protocol_code_net_unreach, rec_iface, NULL );
+    sr_send_icmp_t3_to(sr, packet, icmp_protocol_type_dest_unreach,
+      icmp_protocol_code_net_unreach, rec_iface, NULL );
+  }
+
+  ip_hdr->ip_sum = 0;
+  ip_hdr->ip_sum = cksum(i_phdr, sizeof(sr_ip_hdr_t));
+
+ 
+
+  struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), next_hop_ip->gw.s_addr);
+  
+  if(!arp_entry){
+    struct sr_arpreq *request = sr_arpcache_queuereq(&(sr->cache), next_hop_ip->gw.s_addr, packet, 
+                                    len, next_hop_ip->interface);
+    handle_arpreq(sr, request);
+    return;
   }
 
   struct sr_if *out_if = sr_get_interface(sr, next_hop_ip->interface);
 
-  // See if we have a matching interface to forward the packet to
+  memcpy(eh_dr->ether_shost, (uint8_t *) out_if->addr, sizeof(uint8_t) * ETHER_ADDR_LEN);
+  memcpy(eh_dr->ether_dhost, arp_entry->mac, sizeof(uint8_t) * ETHER_ADDR_LEN);
+  free(arp_entry);
+
+  sr_send_packet(sr, packet, len, out_if->name);
+  return;
+
+  /*
   if(out_if) {
-    struct sr_arpentry *arp_entry = sr_arpcache_lookup(&sr->cache, ip_hdr->ip_dst);
+    //struct sr_arpentry *arp_entry = sr_arpcache_lookup(&sr->cache, ip_hdr->ip_dst);
     if(arp_entry) {
       Debug("Using next_hop_ip->mac mapping in entry to send the packet\n");
       sr_forward_packet(sr, packet, len, arp_entry->mac, out_if);
@@ -118,6 +141,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
       return;
     }
   }
+  */
   
 }
 

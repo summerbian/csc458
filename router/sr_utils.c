@@ -241,6 +241,7 @@ struct sr_if *get_outgoing_iface(struct sr_instance *sr, uint8_t *addr)
                 break;
             }
         }
+
         if (match) {
             dest_iface = curr_iface;
             break;
@@ -277,7 +278,7 @@ void sr_forward_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len
   ip_hdr->ip_sum = 0;
   ip_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t)); 
 
-  // Send it away!
+  // Send 
   sr_send_packet(sr, packet, len, out_iface->name);
 }
 
