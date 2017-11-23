@@ -9,6 +9,7 @@
  * This function handles sending ARP requests if necessary. Based on
  * pesudocode given in header
  */
+ /*
 void sr_arpcache_handle_req_sending(struct sr_instance *sr, struct sr_arpreq *req) {
   time_t now = time(NULL);
 
@@ -36,13 +37,15 @@ void sr_arpcache_handle_req_sending(struct sr_instance *sr, struct sr_arpreq *re
       sr_arpreq_destroy(&sr->cache, req);
     }
     else {
-      sr_send_arp_req(sr, req->ip);
+      sr_send_arp_req(sr, req);
       req->sent = time(NULL);
       req->times_sent++;
     }
   }
   pthread_mutex_unlock(&sr->cache.lock);
 }
+
+*/
 
 /* 
   This function gets called every second. For each request sent out, we keep
@@ -83,7 +86,7 @@ void handle_arpreq(struct sr_instance* sr, struct sr_arpreq *req) {
             //req->ip
         }
         else {
-            sr_send_arp_req(sr, req->ip);
+            sr_send_arp_req(sr, req);
             req->sent = time(NULL);
             req->times_sent++;
         }

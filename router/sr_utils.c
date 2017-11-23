@@ -383,14 +383,14 @@ void sr_send_icmp_t3_to(struct sr_instance *sr, uint8_t *receiver,
   ;
 }
 
-void sr_send_arp_req(struct sr_instance *sr, uint32_t tip) {
+void sr_send_arp_req(struct sr_instance *sr, struct sr_arpreq *req) {
   // Allocate space for a new ARP request  packet
   unsigned int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
   uint8_t *packet = (uint8_t *)malloc(len);
   bzero(packet, len);
 
   // Find interface we should be sending the packet out on
-  struct sr_if *out_iface = sr_iface_for_dst(sr, tip);
+  struct sr_if *out_iface = sr_get_interface(sr, req->packets->iface);
 
   struct sr_ethernet_hdr *eth_hdr = packet_get_eth_hdr(packet);
   struct sr_arp_hdr *arp_hdr = packet_get_arp_hdr(packet);
@@ -408,7 +408,7 @@ void sr_send_arp_req(struct sr_instance *sr, uint32_t tip) {
   memcpy(arp_hdr->ar_sha, out_iface->addr, ETHER_ADDR_LEN);
   arp_hdr->ar_sip = out_iface->ip;
   memset(arp_hdr->ar_tha, 0xff, ETHER_ADDR_LEN);
-  arp_hdr->ar_tip = tip;
+  arp_hdr->ar_tip = req->ip;
 
   sr_send_packet(sr, packet, len, out_iface->name);
   

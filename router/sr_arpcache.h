@@ -106,8 +106,9 @@ struct sr_arpcache {
     pthread_mutexattr_t attr;
 };
 
-void sr_arpcache_handle_req_sending(struct sr_instance *sr, struct sr_arpreq *req);
+//void sr_arpcache_handle_req_sending(struct sr_instance *sr, struct sr_arpreq *req);
 void handle_arpreq(struct sr_instance* sr, struct sr_arpreq *req);
+
 /* 
   This function gets called every second. For each request sent out, we keep
   checking whether we should resend an request or destroy the arp request.
