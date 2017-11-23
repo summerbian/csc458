@@ -383,7 +383,7 @@ void sr_send_icmp_t3_to(struct sr_instance *sr, uint8_t *receiver,
   ;
 }
 
-int sr_send_arp_req(struct sr_instance *sr, uint32_t tip) {
+void sr_send_arp_req(struct sr_instance *sr, uint32_t tip) {
   // Allocate space for a new ARP request  packet
   unsigned int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
   uint8_t *packet = (uint8_t *)malloc(len);
@@ -410,8 +410,8 @@ int sr_send_arp_req(struct sr_instance *sr, uint32_t tip) {
   memset(arp_hdr->ar_tha, 0xff, ETHER_ADDR_LEN);
   arp_hdr->ar_tip = tip;
 
-  int res = sr_send_packet(sr, packet, len, out_iface->name);
-  return res;
+  sr_send_packet(sr, packet, len, out_iface->name);
+  
 }
 
 int sr_send_arp_rep(struct sr_instance *sr, sr_ethernet_hdr_t *req_eth_hdr,
