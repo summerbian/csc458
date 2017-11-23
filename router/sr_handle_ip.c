@@ -123,25 +123,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
   sr_send_packet(sr, packet, len, out_if->name);
   return;
 }
-  /*
-  if(out_if) {
-    //struct sr_arpentry *arp_entry = sr_arpcache_lookup(&sr->cache, ip_hdr->ip_dst);
-    if(arp_entry) {
-      Debug("Using next_hop_ip->mac mapping in entry to send the packet\n");
-      sr_forward_packet(sr, packet, len, arp_entry->mac, out_if);
-      free(arp_entry);
-      return;
-    }
-    else {
-      Debug("\t No entry found for receiver IP, queing packet and sending ARP req\n");
-      struct sr_arpreq *req = sr_arpcache_queuereq(&sr->cache, 
-          ip_hdr->ip_dst, packet, len, out_if->name);
 
-      sr_arpcache_handle_req_sending(sr, req);
-      return;
-    }
-  }
-  */
   
 
 
