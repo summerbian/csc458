@@ -100,12 +100,11 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
     Debug("\t net unreachable\n");
     sr_send_icmp_t3_to(sr, packet, icmp_protocol_type_dest_unreach,
       icmp_protocol_code_net_unreach, rec_iface, NULL );
+      return;
   }
 
   ip_hdr->ip_sum = 0;
   ip_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t));
-
- 
 
   struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), next_hop_ip->gw.s_addr);
   
@@ -115,7 +114,6 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
     handle_arpreq(sr, request);
     return;
   }
-
   struct sr_if *out_if = sr_get_interface(sr, next_hop_ip->interface);
 
   memcpy(eh_dr->ether_shost, (uint8_t *) out_if->addr, sizeof(uint8_t) * ETHER_ADDR_LEN);
@@ -124,7 +122,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
 
   sr_send_packet(sr, packet, len, out_if->name);
   return;
-
+}
   /*
   if(out_if) {
     //struct sr_arpentry *arp_entry = sr_arpcache_lookup(&sr->cache, ip_hdr->ip_dst);
@@ -145,7 +143,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
   }
   */
   
-}
+
 
 void sr_handle_ip_rec(struct sr_instance *sr, uint8_t *packet,
     unsigned int len, struct sr_if *rec_iface, struct sr_if* target_iface) {
