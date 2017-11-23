@@ -101,7 +101,7 @@ void sr_do_forwarding(struct sr_instance *sr, uint8_t *packet,
   }
 
   ip_hdr->ip_sum = 0;
-  ip_hdr->ip_sum = cksum(i_phdr, sizeof(sr_ip_hdr_t));
+  ip_hdr->ip_sum = cksum(ip_hdr, sizeof(sr_ip_hdr_t));
 
  
 
